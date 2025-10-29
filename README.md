@@ -75,13 +75,13 @@ DEEPSEEK_MODEL=deepseek-reasoner
 
 将作业.zip复制到 `/Cpp_Eval/data/` 下
 
-### 3. 运行评价
+### 4. 运行评价
 
 ```bash
 python3 src/main.py data/第02周上机作业.zip --week 02
 ```
 
-### 4. 查看结果
+### 5. 查看结果
 
 评价完成后会生成：
 
@@ -422,4 +422,5 @@ WEEK_BATCH_PROMPTS = {
 - 📖 **使用文档**：查看README.md和相关文档
 - 🔧 **故障排除**：参考TROUBLESHOOTING.md
 - 💡 **功能建议**：欢迎在Issues中提出
+
 
