@@ -71,6 +71,10 @@ DEEPSEEK_MODEL=deepseek-reasoner
 # DEEPSEEK_MODEL=deepseek-chat  # 标准聊天模型
 ```
 
+### 3.添加作业数据
+
+将作业.zip复制到 `/Cpp_Eval/data/` 下
+
 ### 3. 运行评价
 
 ```bash
@@ -418,3 +422,4 @@ WEEK_BATCH_PROMPTS = {
 - 📖 **使用文档**：查看README.md和相关文档
 - 🔧 **故障排除**：参考TROUBLESHOOTING.md
 - 💡 **功能建议**：欢迎在Issues中提出
+
