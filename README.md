@@ -6,11 +6,12 @@
 
 - ✅ 自动解压ZIP格式的作业文件
 - ✅ 智能识别学生姓名和代码文件
-- ✅ 支持多个大模型API（OpenAI、Claude、通义千问等）
+- ✅ 支持多个大模型API（DeepSeek、OpenAI、Claude、通义千问等）
 - ✅ 可自定义评价提示词，针对不同周次定制评价标准
 - ✅ 自动生成详细的评价报告（Markdown/文本格式）
 - ✅ 生成Excel汇总表格，方便统计和管理
 - ✅ 支持批量处理多个学生的作业
+- 🆕 推荐使用DeepSeek API（性价比最高，代码能力强）
 
 ## 项目结构
 
@@ -118,7 +119,7 @@ python src/main.py <ZIP文件路径> [选项]
 |------|------|--------|
 | `zip_path` | 作业ZIP文件路径（必需） | - |
 | `--week` | 作业周次 | 02 |
-| `--provider` | API提供商 (openai/claude/dashscope) | 从.env读取 |
+| `--provider` | API提供商 (openai/claude/dashscope/deepseek) | 从.env读取 |
 | `--output` | 输出目录 | ./output |
 | `--no-individual` | 不保存单个学生报告 | - |
 | `--no-excel` | 不保存Excel汇总 | - |
@@ -132,6 +133,9 @@ python src/main.py data/第02周上机作业.zip
 
 # 指定周次
 python src/main.py data/第03周上机作业.zip --week 03
+
+# 使用DeepSeek API（推荐：性价比高）
+python src/main.py data/第02周上机作业.zip --provider deepseek
 
 # 使用Claude API
 python src/main.py data/第02周上机作业.zip --provider claude
@@ -204,6 +208,25 @@ DASHSCOPE_API_KEY=your_key
 ```bash
 pip install dashscope
 ```
+
+### DeepSeek（推荐：性价比高）
+
+DeepSeek是一个性价比极高的国产大模型，特别擅长代码相关任务，非常适合用于C++作业评价。
+
+```bash
+API_PROVIDER=deepseek
+DEEPSEEK_API_KEY=your_key
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+**优势：**
+- 💰 **价格低廉**：比GPT-4便宜10-20倍
+- 🚀 **代码能力强**：在代码理解和生成方面表现优秀
+- 🇨🇳 **国内访问稳定**：无需特殊网络环境
+- ⚡ **响应速度快**：延迟低，适合批量处理
+
+**获取API密钥：**
+访问 [https://platform.deepseek.com/](https://platform.deepseek.com/) 注册账号并获取API密钥。
 
 ## 常见问题
 

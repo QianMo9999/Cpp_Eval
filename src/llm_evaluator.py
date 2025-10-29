@@ -1,6 +1,6 @@
 """
 大模型API调用模块
-支持多个大模型提供商：OpenAI、Claude、通义千问等
+支持多个大模型提供商：OpenAI、Claude、通义千问、DeepSeek等
 """
 import os
 from typing import Optional
@@ -157,12 +157,56 @@ class DashScopeEvaluator(LLMEvaluator):
             raise Exception(f"通义千问API调用失败: {str(e)}")
 
 
+class DeepSeekEvaluator(LLMEvaluator):
+    """DeepSeek评价器"""
+
+    def __init__(self, model: str = None):
+        super().__init__()
+        from openai import OpenAI
+
+        self.api_key = os.getenv('DEEPSEEK_API_KEY')
+        if not self.api_key:
+            raise ValueError("请在.env文件中设置DEEPSEEK_API_KEY")
+
+        self.model = model or os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
+        # DeepSeek使用OpenAI兼容的API接口
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com"
+        )
+
+    def evaluate(self, prompt: str) -> str:
+        """
+        使用DeepSeek API进行评价
+
+        Args:
+            prompt: 评价提示词
+
+        Returns:
+            评价结果
+        """
+        try:
+            print(f"正在调用DeepSeek API ({self.model})...")
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "你是一位专业的C++编程教师，负责评价学生的作业代码。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"DeepSeek API调用失败: {str(e)}")
+
+
 def get_evaluator(provider: str = None, model: str = None) -> LLMEvaluator:
     """
     获取评价器实例
 
     Args:
-        provider: API提供商 (openai, claude, dashscope)
+        provider: API提供商 (openai, claude, dashscope, deepseek)
         model: 模型名称（可选）
 
     Returns:
@@ -177,6 +221,7 @@ def get_evaluator(provider: str = None, model: str = None) -> LLMEvaluator:
         'openai': OpenAIEvaluator,
         'claude': ClaudeEvaluator,
         'dashscope': DashScopeEvaluator,
+        'deepseek': DeepSeekEvaluator,
     }
 
     if provider not in evaluators:

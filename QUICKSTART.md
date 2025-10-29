@@ -16,9 +16,13 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # 编辑.env文件，填入你的API密钥
-# 如果使用OpenAI:
-API_PROVIDER=openai
-OPENAI_API_KEY=你的API密钥
+# 推荐使用DeepSeek（性价比最高）:
+API_PROVIDER=deepseek
+DEEPSEEK_API_KEY=你的API密钥
+
+# 或使用OpenAI:
+# API_PROVIDER=openai
+# OPENAI_API_KEY=你的API密钥
 ```
 
 ### 第三步：准备作业文件
@@ -111,6 +115,7 @@ WEEK_SPECIFIC_PROMPTS = {
 
 ## 支持的API提供商
 
+- ✅ **DeepSeek** (推荐：性价比最高，代码能力强)
 - ✅ OpenAI (GPT-4, GPT-3.5)
 - ✅ Anthropic Claude
 - ✅ 阿里云通义千问
@@ -118,8 +123,11 @@ WEEK_SPECIFIC_PROMPTS = {
 
 ## 常见问题
 
+**Q: 推荐使用哪个API？**
+A: 推荐使用DeepSeek，性价比高、代码能力强、国内访问稳定。访问 https://platform.deepseek.com/ 获取API密钥。
+
 **Q: API调用费用是多少？**
-A: 取决于使用的模型和代码量。建议先用少量数据测试，GPT-3.5成本较低。
+A: DeepSeek非常便宜（约￥1/百万tokens），GPT-3.5也较低，GPT-4较贵。建议先小规模测试。
 
 **Q: 可以离线使用吗？**
 A: 需要联网调用API，但可以配置本地部署的大模型（需自行实现API接口）。

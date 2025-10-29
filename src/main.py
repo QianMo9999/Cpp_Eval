@@ -18,7 +18,7 @@ from result_saver import ResultSaver
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config')
 sys.path.insert(0, config_path)
 
-from prompts import get_prompt
+from config.prompts import get_prompt
 
 
 class HomeworkEvaluationSystem:
@@ -229,7 +229,7 @@ def main():
     parser = argparse.ArgumentParser(description='C++作业自动评价系统')
     parser.add_argument('zip_path', help='作业ZIP文件路径')
     parser.add_argument('--week', default='02', help='作业周次 (默认: 02)')
-    parser.add_argument('--provider', choices=['openai', 'claude', 'dashscope'],
+    parser.add_argument('--provider', choices=['openai', 'claude', 'dashscope', 'deepseek'],
                         help='API提供商 (默认: 从.env读取)')
     parser.add_argument('--output', default='./output', help='输出目录 (默认: ./output)')
     parser.add_argument('--no-individual', action='store_true', help='不保存单个报告')
