@@ -94,6 +94,10 @@ output/
 └── 第02周_评价结果_时间戳.json     # JSON原始数据
 ```
 
+### 6.故障处理指南
+
+查看 `TROUBLESHOOTING.md` 故障处理指南
+
 ## 📋 使用说明
 
 ### 基本命令
@@ -422,5 +426,6 @@ WEEK_BATCH_PROMPTS = {
 - 📖 **使用文档**：查看README.md和相关文档
 - 🔧 **故障排除**：参考TROUBLESHOOTING.md
 - 💡 **功能建议**：欢迎在Issues中提出
+
 
 
