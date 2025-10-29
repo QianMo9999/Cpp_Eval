@@ -62,7 +62,7 @@ class OpenAIEvaluator(LLMEvaluator):
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=50000  # 进一步增加token限制，支持更长的评价内容
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -194,10 +194,33 @@ class DeepSeekEvaluator(LLMEvaluator):
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=4000  # 增加token限制
             )
-            return response.choices[0].message.content
+            
+            # 【修复】处理DeepSeek Reasoner模型的特殊响应格式
+            result = response.choices[0].message.content
+            reasoning_content = getattr(response.choices[0].message, 'reasoning_content', None)
+            
+            print(f"   API响应状态: 成功")
+            print(f"   finish_reason: {response.choices[0].finish_reason}")
+            print(f"   返回内容长度: {len(result) if result else 0} 字符")
+            print(f"   推理内容长度: {len(reasoning_content) if reasoning_content else 0} 字符")
+            
+            # 如果主要内容为空但有推理内容，使用推理内容
+            if (not result or len(result.strip()) < 10) and reasoning_content:
+                print(f"   使用推理内容作为评价结果")
+                result = reasoning_content
+            
+            if not result or len(result.strip()) < 10:
+                print(f"   ⚠ 警告：API返回内容为空或过短")
+                print(f"   原始响应: {response}")
+                raise Exception("API返回内容为空或过短，可能是模型限制或配额问题")
+            
+            print(f"   返回内容预览: {result[:200]}...")
+            return result
+            
         except Exception as e:
+            print(f"   ❌ API调用失败: {str(e)}")
             raise Exception(f"DeepSeek API调用失败: {str(e)}")
 
 
