@@ -88,7 +88,7 @@ DEEPSEEK_API_KEY=sk-your-deepseek-api-key-here
 DEEPSEEK_MODEL=deepseek-chat
 
 # 其他选项
-# DEEPSEEK_MODEL=deepseek-chat  # 标准聊天模型
+# DEEPSEEK_MODEL=deepseek-reasoner  # 标准聊天模型
 ```
 
 ### 3.添加作业数据
