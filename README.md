@@ -161,8 +161,8 @@ python src/main.py data/第02周上机作业.zip --week 02 --no-pdf
 ```bash
 API_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your_key
-DEEPSEEK_MODEL=deepseek-chat  # 推理模型（推荐）
-# DEEPSEEK_MODEL=deepseek-reasoner    # 聊天模型
+DEEPSEEK_MODEL=deepseek-chat  # 聊天模型（推荐）
+# DEEPSEEK_MODEL=deepseek-reasoner    # 推理模型
 ```
 
 ### OpenAI GPT系列
