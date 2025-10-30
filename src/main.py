@@ -6,6 +6,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+import time
 
 # 添加项目路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,7 +19,7 @@ from llm_evaluator import get_evaluator
 from result_saver import ResultSaver
 
 # 导入prompts模块
-from config.prompts import get_prompt, get_batch_prompt
+from config.prompts import get_batch_prompt
 import re
 
 
@@ -53,6 +54,9 @@ class HomeworkEvaluationSystem:
         # 评价结果列表
         self.results = []
 
+        # 时间记录
+        self.time_records = []
+
     def run(self, save_pdf: bool = True, save_excel: bool = False, save_json: bool = True):
         """
         运行完整的评价流程
@@ -65,12 +69,17 @@ class HomeworkEvaluationSystem:
         Returns:
             评价结果列表
         """
+        # 记录总开始时间
+        total_start_time = time.time()
+        start_datetime = datetime.now()
+
         print("=" * 60)
         print("C++作业自动评价系统")
         print("=" * 60)
         print(f"ZIP文件: {self.zip_path}")
         print(f"作业周次: 第{self.week}周")
         print(f"输出目录: {self.output_dir}")
+        print(f"开始时间: {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 60)
 
         # 1. 解压ZIP文件
@@ -129,6 +138,9 @@ class HomeworkEvaluationSystem:
             student_id = student.get('student_id', '')
             num_problems = student['file_count']
 
+            # 记录学生评价开始时间
+            student_start_time = time.time()
+
             print(f"\n[{idx}/{len(submitted_students)}] 评价学生: {student_id} {student_name} ({num_problems}道题)")
 
             try:
@@ -150,6 +162,17 @@ class HomeworkEvaluationSystem:
                         'file_path': file_path,
                         'code': code
                     })
+
+                # 【修复】按题目名称排序，确保"第1关"、"第2关"...的顺序正确
+                def extract_problem_number(problem_name):
+                    """从题目名称中提取数字用于排序"""
+                    import re
+                    match = re.search(r'第(\d+)关', problem_name)
+                    if match:
+                        return int(match.group(1))
+                    return 999  # 没有匹配的放到最后
+
+                all_problems.sort(key=lambda p: extract_problem_number(p['problem_name']))
 
                 # 生成批量评价提示词
                 batch_prompt = get_batch_prompt(
@@ -184,10 +207,11 @@ class HomeworkEvaluationSystem:
                     }
                     self.results.append(result)
 
-                    # 添加到学生评价列表（用于生成PDF）
+                    # 【修复】添加到学生评价列表（用于生成PDF），包含代码和problem_name
                     student_evaluations.append({
                         'file_name': problem['file_name'],
                         'problem_name': problem['problem_name'],
+                        'code': problem['code'],  # 添加学生代码
                         'evaluation': evaluation_data['evaluation'],
                         'score': evaluation_data['score'],
                         'timestamp': result['timestamp']
@@ -196,7 +220,21 @@ class HomeworkEvaluationSystem:
                 # 计算平均分
                 scores = [e['score'] for e in problem_evaluations if e['score'] is not None]
                 avg_score = sum(scores) / len(scores) if scores else 0
-                print(f"✓ 评价完成 (平均分: {avg_score:.1f}/100，{len(scores)}/{num_problems}题)")
+
+                # 计算该学生的评价时间
+                student_elapsed_time = time.time() - student_start_time
+
+                print(f"✓ 评价完成 (平均分: {avg_score:.1f}/100，{len(scores)}/{num_problems}题，耗时: {student_elapsed_time:.1f}秒)")
+
+                # 记录时间
+                self.time_records.append({
+                    'student_name': student_name,
+                    'student_id': student_id,
+                    'num_problems': num_problems,
+                    'time_seconds': student_elapsed_time,
+                    'time_formatted': f"{int(student_elapsed_time // 60)}分{int(student_elapsed_time % 60)}秒",
+                    'status': 'success'
+                })
 
                 # 【关键修改】评价完立即生成PDF
                 if save_pdf and student_evaluations:
@@ -214,7 +252,22 @@ class HomeworkEvaluationSystem:
                         print(f"⚠ PDF生成失败: {str(e)}")
 
             except Exception as e:
-                print(f"✗ 评价失败: {str(e)}")
+                # 计算失败时的时间
+                student_elapsed_time = time.time() - student_start_time
+
+                print(f"✗ 评价失败: {str(e)} (耗时: {student_elapsed_time:.1f}秒)")
+
+                # 记录失败的时间
+                self.time_records.append({
+                    'student_name': student_name,
+                    'student_id': student_id,
+                    'num_problems': num_problems,
+                    'time_seconds': student_elapsed_time,
+                    'time_formatted': f"{int(student_elapsed_time // 60)}分{int(student_elapsed_time % 60)}秒",
+                    'status': 'failed',
+                    'error': str(e)
+                })
+
                 # 记录失败信息（为该学生的每个文件都记录失败）
                 for problem in all_problems if 'all_problems' in locals() else student['files']:
                     self.results.append({
@@ -250,7 +303,17 @@ class HomeworkEvaluationSystem:
             except Exception as e:
                 print(f"✗ JSON保存失败: {str(e)}")
 
-        # 5. 输出统计信息
+        # 【新增】保存时间统计
+        if self.time_records:
+            try:
+                self._save_time_report()
+            except Exception as e:
+                print(f"✗ 时间统计保存失败: {str(e)}")
+
+        # 5. 计算总时间并输出统计信息
+        total_elapsed_time = time.time() - total_start_time
+        end_datetime = datetime.now()
+
         print("\n" + "=" * 60)
         print("评价完成!")
         print("=" * 60)
@@ -275,9 +338,95 @@ class HomeworkEvaluationSystem:
                 print(f"  - 最高分: {max(scores)}")
                 print(f"  - 最低分: {min(scores)}")
 
+        # 【新增】时间统计
+        print(f"\n时间统计:")
+        print(f"  - 开始时间: {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"  - 结束时间: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"  - 总耗时: {int(total_elapsed_time // 60)}分{int(total_elapsed_time % 60)}秒 ({total_elapsed_time:.1f}秒)")
+
+        # 成功评价的学生平均时间
+        success_records = [r for r in self.time_records if r['status'] == 'success']
+        if success_records:
+            avg_time = sum(r['time_seconds'] for r in success_records) / len(success_records)
+            print(f"  - 平均每人耗时: {int(avg_time // 60)}分{int(avg_time % 60)}秒 ({avg_time:.1f}秒)")
+
+            # 找出最快和最慢的学生
+            fastest = min(success_records, key=lambda x: x['time_seconds'])
+            slowest = max(success_records, key=lambda x: x['time_seconds'])
+            print(f"  - 最快: {fastest['student_name']} ({fastest['time_formatted']})")
+            print(f"  - 最慢: {slowest['student_name']} ({slowest['time_formatted']})")
+
         print("=" * 60)
 
         return self.results
+
+    def _save_time_report(self):
+        """
+        保存时间统计报告
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = os.path.join(self.output_dir, f"第{self.week}周_时间统计_{timestamp}.txt")
+
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write("=" * 60 + "\n")
+            f.write("C++作业评价系统 - 时间统计报告\n")
+            f.write("=" * 60 + "\n\n")
+
+            f.write(f"作业周次: 第{self.week}周\n")
+            f.write(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            f.write("-" * 60 + "\n")
+            f.write("详细时间记录（每个学生）\n")
+            f.write("-" * 60 + "\n\n")
+
+            # 按时间排序
+            sorted_records = sorted(self.time_records, key=lambda x: x['time_seconds'], reverse=True)
+
+            f.write(f"{'序号':<6} {'学号':<15} {'姓名':<12} {'题目数':<8} {'耗时':<15} {'状态':<8}\n")
+            f.write("-" * 80 + "\n")
+
+            for idx, record in enumerate(sorted_records, 1):
+                status_display = '成功' if record['status'] == 'success' else '失败'
+                f.write(
+                    f"{idx:<6} "
+                    f"{record['student_id']:<15} "
+                    f"{record['student_name']:<12} "
+                    f"{record['num_problems']:<8} "
+                    f"{record['time_formatted']:<15} "
+                    f"{status_display:<8}\n"
+                )
+
+                # 如果有错误信息，也记录
+                if 'error' in record:
+                    f.write(f"       错误: {record['error']}\n")
+
+            # 统计信息
+            f.write("\n" + "=" * 60 + "\n")
+            f.write("统计摘要\n")
+            f.write("=" * 60 + "\n\n")
+
+            success_records = [r for r in self.time_records if r['status'] == 'success']
+            total_time = sum(r['time_seconds'] for r in self.time_records)
+
+            f.write(f"总学生数: {len(self.time_records)}\n")
+            f.write(f"成功评价: {len(success_records)}\n")
+            f.write(f"评价失败: {len(self.time_records) - len(success_records)}\n\n")
+
+            f.write(f"总耗时: {int(total_time // 60)}分{int(total_time % 60)}秒\n")
+
+            if success_records:
+                avg_time = sum(r['time_seconds'] for r in success_records) / len(success_records)
+                f.write(f"平均每人耗时: {int(avg_time // 60)}分{int(avg_time % 60)}秒\n\n")
+
+                fastest = min(success_records, key=lambda x: x['time_seconds'])
+                slowest = max(success_records, key=lambda x: x['time_seconds'])
+
+                f.write(f"最快: {fastest['student_name']} ({fastest['time_formatted']})\n")
+                f.write(f"最慢: {slowest['student_name']} ({slowest['time_formatted']})\n")
+
+            f.write("\n" + "=" * 60 + "\n")
+
+        print(f"✓ 已保存时间统计报告: {report_path}")
 
     def _extract_problem_name(self, relative_path: str) -> str:
         """
@@ -320,11 +469,6 @@ class HomeworkEvaluationSystem:
         
         print(f"   正在解析 {len(all_problems)} 道题的评价结果...")
         print(f"   评价内容长度: {len(batch_evaluation)} 字符")
-        
-        # 【调试】输出AI返回的原始评价内容（前500字符）
-        print(f"   AI返回内容预览: {batch_evaluation[:500]}...")
-        if len(batch_evaluation) > 500:
-            print(f"   ...（还有 {len(batch_evaluation) - 500} 个字符）")
         
         # 【调试】检查评价内容是否为空或过短
         if not batch_evaluation or len(batch_evaluation.strip()) < 10:
@@ -531,7 +675,7 @@ def main():
     parser = argparse.ArgumentParser(description='C++作业自动评价系统')
     parser.add_argument('zip_path', help='作业ZIP文件路径')
     parser.add_argument('--week', default='02', help='作业周次 (默认: 02)')
-    parser.add_argument('--provider', choices=['openai', 'claude', 'dashscope', 'deepseek'],
+    parser.add_argument('--provider', choices=['openai', 'claude', 'qwen', 'deepseek'],
                         help='API提供商 (默认: 从.env读取)')
     parser.add_argument('--output', default='./output', help='输出目录 (默认: ./output)')
     parser.add_argument('--no-pdf', action='store_true', help='不生成PDF报告')

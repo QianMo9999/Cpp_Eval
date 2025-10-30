@@ -45,13 +45,33 @@ cpp_homework_evaluator/
 
 ## ⚡ 快速开始
 
-### 1. 安装依赖
+### 1. 系统依赖安装
+
+**macOS用户**：
+```bash
+# 如果没有安装Homebrew，请先安装
+/bin/bash -c "$(curl -fsSL https://gitee.com/cunkai/HomebrewCN/raw/master/Homebrew.sh)"
+
+# 安装系统依赖（PDF生成必需）
+brew install pango gdk-pixbuf libffi
+```
+
+**Ubuntu/Debian用户**：
+```bash
+sudo apt-get update
+sudo apt-get install build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
+```
+
+**Windows用户**：
+建议使用WSL或Docker环境，或者使用预编译的WeasyPrint包。
+
+### 2. Python依赖安装
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 配置API密钥
+### 3. 配置API密钥
 
 复制 `.env.example` 为 `.env` 并配置：
 
@@ -65,7 +85,7 @@ cp .env.example .env
 # DeepSeek Reasoner 配置（推荐）
 API_PROVIDER=deepseek
 DEEPSEEK_API_KEY=sk-your-deepseek-api-key-here
-DEEPSEEK_MODEL=deepseek-reasoner
+DEEPSEEK_MODEL=deepseek-chat
 
 # 其他选项
 # DEEPSEEK_MODEL=deepseek-chat  # 标准聊天模型
@@ -78,7 +98,7 @@ DEEPSEEK_MODEL=deepseek-reasoner
 ### 4. 运行评价
 
 ```bash
-python3 src/main.py data/第02周上机作业.zip --week 02
+python src/main.py data/第02周上机作业.zip --week 02
 ```
 
 ### 5. 查看结果
@@ -103,7 +123,7 @@ output/
 ### 基本命令
 
 ```bash
-python3 src/main.py <ZIP文件路径> [选项]
+python src/main.py <ZIP文件路径> [选项]
 ```
 
 ### 命令行参数
@@ -122,16 +142,16 @@ python3 src/main.py <ZIP文件路径> [选项]
 
 ```bash
 # 基本使用（推荐）
-python3 src/main.py data/第02周上机作业.zip --week 02
+python src/main.py data/第02周上机作业.zip --week 02
 
 # 使用DeepSeek Chat模型
-python3 src/main.py data/第02周上机作业.zip --provider deepseek
+python src/main.py data/第02周上机作业.zip --provider deepseek
 
 # 生成PDF和Excel
-python3 src/main.py data/第02周上机作业.zip --week 02 --excel
+python src/main.py data/第02周上机作业.zip --week 02 --excel
 
 # 只生成JSON，不生成PDF
-python3 src/main.py data/第02周上机作业.zip --week 02 --no-pdf
+python src/main.py data/第02周上机作业.zip --week 02 --no-pdf
 ```
 
 ## 🔧 支持的大模型
@@ -141,15 +161,9 @@ python3 src/main.py data/第02周上机作业.zip --week 02 --no-pdf
 ```bash
 API_PROVIDER=deepseek
 DEEPSEEK_API_KEY=your_key
-DEEPSEEK_MODEL=deepseek-reasoner  # 推理模型（推荐）
-# DEEPSEEK_MODEL=deepseek-chat    # 聊天模型
+DEEPSEEK_MODEL=deepseek-chat  # 推理模型（推荐）
+# DEEPSEEK_MODEL=deepseek-reasoner    # 聊天模型
 ```
-
-**DeepSeek Reasoner 特点：**
-- 🧠 **深度推理**：在推理过程中进行详细思考，评价更全面
-- 📊 **结构化输出**：自动按照要求的格式输出评价结果
-- 🎯 **精准分析**：能够准确识别代码问题并给出改进建议
-- 💡 **教学导向**：评价风格更适合教学场景
 
 ### OpenAI GPT系列
 
@@ -171,7 +185,8 @@ ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 
 ```bash
 API_PROVIDER=dashscope
-DASHSCOPE_API_KEY=your_key
+QWEN_API_KEY=your_key
+QWEN_MODEL=qwen3-coder-plus
 ```
 
 ## 🎯 系统特性

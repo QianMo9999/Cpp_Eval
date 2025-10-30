@@ -108,19 +108,27 @@ class ClaudeEvaluator(LLMEvaluator):
             raise Exception(f"Claude API调用失败: {str(e)}")
 
 
-class DashScopeEvaluator(LLMEvaluator):
+class QwenEvaluator(LLMEvaluator):
     """通义千问评价器"""
 
     def __init__(self, model: str = "qwen-turbo"):
         super().__init__()
-        self.api_key = os.getenv('DASHSCOPE_API_KEY')
+        
+        from openai import OpenAI
+
+        self.api_key = os.getenv('QWEN_API_KEY')
+
         if not self.api_key:
-            raise ValueError("请在.env文件中设置DASHSCOPE_API_KEY")
+            raise ValueError("请在.env文件中设置DEEPSEEK_API_KEY")
+        
+        self.model = model or os.getenv('QWEN_MODEL', 'qwen3-coder-plus')
 
-        self.model = model
-        # 设置API Key
-        os.environ['DASHSCOPE_API_KEY'] = self.api_key
-
+        self.client = OpenAI(
+            # 若没有配置环境变量，请用ideaLAB的API Key将下行替换为：api_key="xxx",
+            api_key=self.api_key, 
+            base_url="https://idealab.alibaba-inc.com/api/openai/v1",
+        )
+        
     def evaluate(self, prompt: str) -> str:
         """
         使用通义千问API进行评价
@@ -132,27 +140,21 @@ class DashScopeEvaluator(LLMEvaluator):
             评价结果
         """
         try:
-            import dashscope
-            from dashscope import Generation
-
             print(f"正在调用通义千问API ({self.model})...")
-            response = Generation.call(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {'role': 'system', 'content': '你是一位专业的C++编程教师，负责评价学生的作业代码。'},
-                    {'role': 'user', 'content': prompt}
+                    {"role": "system", "content": "你是一位专业的C++编程教师，负责评价学生的作业代码。"},
+                    {"role": "user", "content": prompt}
                 ],
-                result_format='message',
-                temperature=0.7,
-                max_tokens=2000
             )
+            # print(response.model_dump_json())
 
-            if response.status_code == 200:
-                return response.output.choices[0].message.content
+            if response.choices and len(response.choices) > 0:
+                return response.choices[0].message.content
             else:
-                raise Exception(f"API返回错误: {response.message}")
-        except ImportError:
-            raise Exception("请安装dashscope库: pip install dashscope")
+                raise Exception("API返回了空的响应内容")
+                
         except Exception as e:
             raise Exception(f"通义千问API调用失败: {str(e)}")
 
@@ -243,7 +245,7 @@ def get_evaluator(provider: str = None, model: str = None) -> LLMEvaluator:
     evaluators = {
         'openai': OpenAIEvaluator,
         'claude': ClaudeEvaluator,
-        'dashscope': DashScopeEvaluator,
+        'qwen': QwenEvaluator,
         'deepseek': DeepSeekEvaluator,
     }
 

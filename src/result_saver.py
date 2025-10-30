@@ -92,8 +92,6 @@ class ResultSaver:
 {evaluation}
 
 ---
-
-*本评价由AI自动生成，仅供参考*
 """
 
     def _format_text_report(
@@ -121,7 +119,6 @@ C++作业评价报告
 
 ------------------------------------
 
-*本评价由AI自动生成，仅供参考*
 """
 
     def save_summary_excel(
@@ -261,6 +258,7 @@ C++作业评价报告
     ) -> str:
         """
         为每个学生生成一份PDF报告，包含所有题目的评价
+        【新方案】先生成Markdown，然后渲染为HTML，最后转换为PDF
 
         Args:
             student_name: 学生姓名
@@ -269,6 +267,8 @@ C++作业评价报告
                 [
                     {
                         'file_name': 'main.cpp',
+                        'problem_name': '第1关-求三位数',
+                        'code': '代码内容...',
                         'evaluation': '评价内容...',
                         'score': 85,
                         'timestamp': '2024-01-01 10:00:00'
@@ -281,16 +281,20 @@ C++作业评价报告
             保存的文件路径
         """
         try:
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import cm
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
-            from reportlab.lib import colors
-            from reportlab.pdfbase import pdfmetrics
-            from reportlab.pdfbase.ttfonts import TTFont
-            from reportlab.lib.enums import TA_CENTER, TA_LEFT
+            import markdown
+            from weasyprint import HTML, CSS
+            from weasyprint.text.fonts import FontConfiguration
+            # 尝试导入 Pygments 用于代码高亮
+            try:
+                from pygments.formatters import HtmlFormatter
+                PYGMENTS_AVAILABLE = True
+            except ImportError:
+                PYGMENTS_AVAILABLE = False
         except ImportError:
-            raise Exception("请安装reportlab库: pip install reportlab")
+            print("⚠ 缺少依赖库，请安装:")
+            print("  pip install markdown weasyprint")
+            print("  可选（代码高亮）: pip install pygments")
+            raise Exception("请安装markdown和weasyprint库")
 
         # 创建周次目录
         week_dir = os.path.join(self.output_dir, f"第{week}周_PDF")
@@ -299,180 +303,353 @@ C++作业评价报告
         # 生成文件名
         safe_student_name = student_name.replace('/', '_').replace('\\', '_')
         student_display = f"{student_id}_{safe_student_name}" if student_id else safe_student_name
-        file_path = os.path.join(week_dir, f"{student_display}_评价报告.pdf")
 
-        # 注册中文字体（尝试使用系统字体）
-        try:
-            # macOS
-            pdfmetrics.registerFont(TTFont('SimSun', '/System/Library/Fonts/STHeiti Light.ttc'))
-            chinese_font = 'SimSun'
-        except:
-            try:
-                # Windows
-                pdfmetrics.registerFont(TTFont('SimSun', 'C:/Windows/Fonts/simsun.ttc'))
-                chinese_font = 'SimSun'
-            except:
-                # 如果都失败，使用默认字体（可能无法显示中文）
-                chinese_font = 'Helvetica'
-                print(f"⚠ 未找到中文字体，PDF中的中文可能无法正常显示")
+        md_file_path = os.path.join(week_dir, f"{student_display}_评价报告.md")
+        pdf_file_path = os.path.join(week_dir, f"{student_display}_评价报告.pdf")
 
-        # 创建PDF文档
-        doc = SimpleDocTemplate(
-            file_path,
-            pagesize=A4,
-            rightMargin=2*cm,
-            leftMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm
+        # 1. 生成Markdown内容
+        markdown_content = self._generate_markdown_report(
+            student_name, student_id, evaluations, week
         )
 
-        # 准备内容
-        story = []
+        # 保存Markdown文件
+        with open(md_file_path, 'w', encoding='utf-8') as f:
+            f.write(markdown_content)
 
-        # 创建样式
-        styles = getSampleStyleSheet()
-
-        # 标题样式
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontName=chinese_font,
-            fontSize=18,
-            alignment=TA_CENTER,
-            spaceAfter=12,
-            textColor=colors.HexColor('#1a5490')
-        )
-
-        # 副标题样式
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=styles['Heading2'],
-            fontName=chinese_font,
-            fontSize=14,
-            spaceAfter=10,
-            textColor=colors.HexColor('#2c5282')
-        )
-
-        # 正文样式
-        body_style = ParagraphStyle(
-            'CustomBody',
-            parent=styles['BodyText'],
-            fontName=chinese_font,
-            fontSize=10,
-            spaceAfter=6,
-            leading=16
-        )
-
-        # 添加标题
-        story.append(Paragraph(f"C++作业评价报告", title_style))
-        story.append(Spacer(1, 0.5*cm))
-
-        # 添加学生信息表格
-        student_info = [
-            ['学生姓名', student_name, '学号', student_id or '无'],
-            ['作业周次', f'第{week}周', '评价时间', datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-            ['题目总数', str(len(evaluations)), '总评分', self._calculate_total_score(evaluations)]
+        # 2. 将Markdown转换为HTML
+        md_extensions = [
+            'fenced_code',      # 支持```代码块
+            'tables',           # 表格支持
+            'nl2br',            # 换行支持
+            'extra',            # 额外功能
         ]
 
-        info_table = Table(student_info, colWidths=[3*cm, 5*cm, 3*cm, 5*cm])
-        info_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), chinese_font),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e2e8f0')),
-            ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#e2e8f0')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
+        # 启用代码高亮
+        if PYGMENTS_AVAILABLE:
+            md_extensions.append('codehilite')
 
-        story.append(info_table)
-        story.append(Spacer(1, 0.8*cm))
+        md = markdown.Markdown(
+            extensions=md_extensions,
+            extension_configs={
+                'codehilite': {
+                    'css_class': 'highlight',
+                    'linenums': False,
+                    'guess_lang': False,
+                }
+            }
+        )
+        html_body = md.convert(markdown_content)
 
-        # 添加每个题目的评价
+        # 获取 Pygments CSS（如果可用）
+        pygments_css = ""
+        if PYGMENTS_AVAILABLE:
+            # 使用 GitHub 风格的语法高亮
+            from pygments.styles import get_style_by_name
+            formatter = HtmlFormatter(style='github-dark')
+            pygments_css = formatter.get_style_defs('.highlight')
+
+        # 3. 添加CSS样式（完全模拟Markdown预览效果）
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>C++作业评价报告 - {student_name}</title>
+    <style>
+        @page {{
+            size: A4;
+            margin: 2cm;
+        }}
+
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+            color: #24292e;
+            font-size: 14px;
+            max-width: 100%;
+        }}
+
+        /* 标题样式 */
+        h1 {{
+            font-size: 2em;
+            font-weight: 600;
+            padding-bottom: 0.3em;
+            border-bottom: 2px solid #1a5490;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            color: #1a5490;
+            text-align: center;
+        }}
+
+        h2 {{
+            font-size: 1.5em;
+            font-weight: 600;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid #eaecef;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            color: #2c5282;
+        }}
+
+        h3 {{
+            font-size: 1.25em;
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            color: #4a5568;
+        }}
+
+        /* 表格样式 */
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            display: table;
+            overflow: auto;
+        }}
+
+        table th {{
+            font-weight: 600;
+            padding: 6px 13px;
+            border: 1px solid #d0d7de;
+            background-color: #f6f8fa;
+        }}
+
+        table td {{
+            padding: 6px 13px;
+            border: 1px solid #d0d7de;
+        }}
+
+        table tr {{
+            background-color: #ffffff;
+            border-top: 1px solid #d0d7de;
+        }}
+
+        table tr:nth-child(2n) {{
+            background-color: #f6f8fa;
+        }}
+
+        /* 代码块样式 */
+        pre {{
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            overflow: auto;
+            font-size: 13px;
+            line-height: 1.45;
+            margin: 16px 0;
+            border: 1px solid #d0d7de;
+        }}
+
+        code {{
+            background-color: rgba(175, 184, 193, 0.2);
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            border-radius: 3px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            color: #24292e;
+        }}
+
+        pre code {{
+            background-color: transparent;
+            padding: 0;
+            font-size: 100%;
+            color: #24292e;
+            border-radius: 0;
+            display: block;
+            white-space: pre;
+            word-break: normal;
+            word-wrap: normal;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        }}
+
+        /* 列表样式 */
+        ul, ol {{
+            padding-left: 2em;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }}
+
+        li {{
+            margin-top: 0.25em;
+        }}
+
+        li + li {{
+            margin-top: 0.25em;
+        }}
+
+        /* 强调样式 */
+        strong {{
+            font-weight: 600;
+        }}
+
+        em {{
+            font-style: italic;
+        }}
+
+        /* 链接样式 */
+        a {{
+            color: #0969da;
+            text-decoration: none;
+        }}
+
+        a:hover {{
+            text-decoration: underline;
+        }}
+
+        /* 水平线 */
+        hr {{
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #d0d7de;
+            border: 0;
+        }}
+
+        /* 引用块 */
+        blockquote {{
+            padding: 0 1em;
+            color: #656d76;
+            border-left: 0.25em solid #d0d7de;
+            margin: 0 0 16px 0;
+        }}
+
+        /* 特殊样式 */
+        .score {{
+            color: #1a7f37;
+            font-weight: 600;
+        }}
+
+        .problem-section {{
+            page-break-inside: avoid;
+            margin-bottom: 32px;
+        }}
+
+        .footer {{
+            margin-top: 48px;
+            padding-top: 16px;
+            border-top: 1px solid #d0d7de;
+            text-align: center;
+            color: #656d76;
+            font-size: 12px;
+        }}
+
+        /* 代码高亮（GitHub风格） */
+        .codehilite {{
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+        }}
+
+        .codehilite pre {{
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }}
+    </style>
+</head>
+<body>
+{html_body}
+</body>
+</html>
+"""
+
+        # 4. 使用WeasyPrint将HTML转换为PDF
+        font_config = FontConfiguration()
+        HTML(string=html_content).write_pdf(
+            pdf_file_path,
+            font_config=font_config
+        )
+
+        print(f"✓ 已保存PDF报告: {pdf_file_path}")
+        print(f"  (Markdown源文件: {md_file_path})")
+
+        return pdf_file_path
+
+    def _generate_markdown_report(
+        self,
+        student_name: str,
+        student_id: str,
+        evaluations: List[Dict],
+        week: str
+    ) -> str:
+        """
+        生成Markdown格式的报告内容
+
+        Args:
+            student_name: 学生姓名
+            student_id: 学号
+            evaluations: 评价列表
+            week: 周次
+
+        Returns:
+            Markdown格式的报告内容
+        """
+        # 计算总评分
+        scores = [e.get('score', 0) for e in evaluations if e.get('score') is not None]
+        total_score = sum(scores)
+        avg_score = total_score / len(scores) if scores else 0
+
+        # 生成报告头部
+        md_content = f"""# C++作业评价报告
+
+| 项目 | 内容 |
+|------|------|
+| **学生姓名** | {student_name} |
+| **学号** | {student_id or '无'} |
+| **作业周次** | 第{week}周 |
+| **评价时间** | {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} |
+| **题目总数** | {len(evaluations)} |
+| **平均分** | {avg_score:.1f}/100 |
+| **总分** | {total_score}/{len(scores)*100} |
+
+---
+
+"""
+
+        # 添加每道题的评价
         for idx, eval_data in enumerate(evaluations, 1):
-            # 题目标题
-            file_name = eval_data.get('file_name', '未知文件')
+            problem_name = eval_data.get('problem_name', eval_data.get('file_name', '未知题目'))
             score = eval_data.get('score', 0)
-
-            story.append(Paragraph(
-                f"题目 {idx}: {file_name} (得分: {score}/100)",
-                subtitle_style
-            ))
-            story.append(Spacer(1, 0.3*cm))
-
-            # 评价内容
+            student_code = eval_data.get('code', '')
             evaluation_text = eval_data.get('evaluation', '无评价')
 
-            # 【修复】改进评价内容处理，确保完整显示
-            if not evaluation_text or evaluation_text.strip() == '':
-                evaluation_text = "该题目暂无评价内容"
-            
-            # 清理和格式化评价内容
+            # 题目标题（不加"题目1:"前缀）
+            md_content += f"""## {problem_name} (得分: {score}/100)
+
+"""
+
+            # 添加学生代码
+            if student_code:
+                # 限制代码行数
+                code_lines = student_code.split('\n')
+                display_code = '\n'.join(code_lines[:50])
+
+                md_content += f"""### 📝 提交代码
+
+```cpp
+{display_code}
+```
+
+"""
+                if len(code_lines) > 50:
+                    md_content += f"*（代码共{len(code_lines)}行，仅显示前50行）*\n\n"
+
+            # 清理评价内容
             evaluation_text = evaluation_text.strip()
-            
             # 移除可能的题目标识重复
             evaluation_text = re.sub(r'^【题目\d+:.*?】\s*', '', evaluation_text)
-            
-            # 将评价内容按段落分割，改进显示效果
-            paragraphs = evaluation_text.split('\n')
-            
-            for para in paragraphs:
-                para = para.strip()
-                if para:
-                    # 【修复】改进特殊字符处理
-                    # 转义XML特殊字符，但保留Markdown格式
-                    safe_para = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                    
-                    # 处理Markdown格式
-                    # 粗体 **text** -> <b>text</b>
-                    safe_para = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', safe_para)
-                    # 斜体 *text* -> <i>text</i>
-                    safe_para = re.sub(r'\*(.*?)\*', r'<i>\1</i>', safe_para)
-                    
-                    try:
-                        story.append(Paragraph(safe_para, body_style))
-                    except Exception as e:
-                        # 如果解析失败，使用纯文本
-                        print(f"   ⚠ 段落解析失败，使用纯文本: {str(e)}")
-                        # 移除所有HTML标签，使用纯文本
-                        plain_text = re.sub(r'<[^>]+>', '', safe_para)
-                        story.append(Paragraph(plain_text, body_style))
-                else:
-                    # 空行用小间距代替
-                    story.append(Spacer(1, 0.1*cm))
+            evaluation_text = re.sub(r'^###\s*题目\d+:.*?\n', '', evaluation_text)
 
-            story.append(Spacer(1, 0.6*cm))
+            md_content += evaluation_text + "\n\n"
 
-            # 如果不是最后一个题目，添加分隔线
+            # 添加分隔线（除了最后一题）
             if idx < len(evaluations):
-                story.append(Spacer(1, 0.3*cm))
-                line_table = Table([['']], colWidths=[16*cm])
-                line_table.setStyle(TableStyle([
-                    ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e0'))
-                ]))
-                story.append(line_table)
-                story.append(Spacer(1, 0.5*cm))
+                md_content += "---\n\n"
 
-        # 添加页脚
-        story.append(Spacer(1, 1*cm))
-        footer_style = ParagraphStyle(
-            'Footer',
-            parent=styles['Normal'],
-            fontName=chinese_font,
-            fontSize=8,
-            alignment=TA_CENTER,
-            textColor=colors.grey
-        )
-        story.append(Paragraph("本评价由AI自动生成，仅供参考", footer_style))
-
-        # 生成PDF
-        doc.build(story)
-
-        print(f"✓ 已保存PDF报告: {file_path}")
-        return file_path
+        return md_content
 
     def _calculate_total_score(self, evaluations: List[Dict]) -> str:
         """
